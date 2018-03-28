@@ -51,6 +51,15 @@ yr_season <- paste( 1900 + # this is the base year for POSIXlt year numbering
 datM <- stackApply(datC, yr_season, mean) #raster with mean for each season
 names(datM) <- unique(yr_season)
 
+##### Creating the composite #####
+## create seasonal mean.
+ssn <- substring(names(datM), 7) #season names for 30 yr seasonal mean
+datMs <- stackApply(datM, ssn, mean) #create the mean
+names(datMs) <- unique(ssn) #give them meaningful names
+datMs <- subset(datMs, c(3,4,1,2)) #reorder because they are setup as MAM, JJA, SON, DJF
+
+
+## Extract wide years from TR data; clunky right now.
 datW <- datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[1] )]]
 datW <- addLayer(datW, datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[2] )]],
                  datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[3])]],
@@ -58,15 +67,68 @@ datW <- addLayer(datW, datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi
                  datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[5])]])
 
 
-datWm <- stackApply(datW, yr_season, mean)
 
-                 
-datN <- datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[1] )]]
-datN <- addLayer(datN, datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[2] )]],
-                 datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[3])]],
-                 datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[4])]],
-                 datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[5])]])             
+ssn <- substring(names(datW), 7)
+datWm <- stackApply(datW, ssn, mean)
+names(datWm) <- unique(ssn)
 
+SeasonsW <- datWm - datMs
+
+datN <- datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[1] )]]
+datN <- addLayer(datN, datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[2] )]],
+                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[3])]],
+                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[4])]],
+                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[5])]])             
+
+ssn <- substring(names(datN), 7)
+datNm <- stackApply(datN, ssn, mean)
+names(datNm) <- unique(ssn)
+
+
+SeasonsN <- datNm - datMs 
+
+library(rgdal)
+library(rgeos)
+coast_shapefile <- crop(readOGR("../GISData/ne_10m_coastline.shp"), ext)
+
+#Create color ramps for mapping and number of colors to use
+library(colorRamps)
+col5 <- colorRampPalette(c('#08519c', 'gray96', "#fee0d2", "firebrick3"))
+
+#Load the lattice packages to display the maps
+library(rasterVis)
+library(gridExtra)
+
+
+#### 30yr Mean - Narrow years
+levelplot(SeasonsN, layout=c(2,2), col.regions = col5, pretty=TRUE, main="Narrow Composite Mean SLP Diff 1979 - 2011",
+          colorkey=list(space="bottom"),
+          par.settings = list(layout.heights=list(xlab.key.padding=1),
+                              strip.background=list(col="lightgrey")
+          ), par.strip.text = list(font="bold")) + 
+  layer(sp.lines(coast_shapefile))
+
+
+#### 30yr Mean - Wide years
+levelplot(SeasonsW, layout=c(2,2), col.regions = col5, pretty=TRUE, main="Wide Composite Mean SLP Diff 1979 - 2011",
+          colorkey=list(space="bottom"),
+          par.settings = list(layout.heights=list(xlab.key.padding=1),
+                              strip.background=list(col="lightgrey")
+          ), par.strip.text = list(font="bold")) + 
+  layer(sp.lines(coast_shapefile))
+
+#### Narrow - Wide
+SeasonsNW <- datNm - datWm
+
+levelplot(SeasonsNW, layout=c(2,2), col.regions = col5, pretty=TRUE, main="Narrow-Wide Composite Mean SLP Diff 1979 - 2011",
+          colorkey=list(space="bottom"),
+          par.settings = list(layout.heights=list(xlab.key.padding=1),
+                              strip.background=list(col="lightgrey")
+          ), par.strip.text = list(font="bold")) + 
+  layer(sp.lines(coast_shapefile))
+
+
+#### Looking at climate correlation - not relevant to composite ####
 
 # If data is not continuous you must
 # replace all NA with a number outside of the bounds of data in order to do correlations.

@@ -35,10 +35,9 @@ library(chron)
 
 yr_mo_dy <- substr(names(datC), 2, 11)
 d <- as.Date(gsub(".", '/', yr_mo_dy, fixed = T)) #fix the format by replacing "." with "/"
-##AH: changed $year==12 to $mon<8 (POSIXlt indexes months from 0
-##AH: and growing season starts in SEP) 
-##AH: can SC confirm that it works?
-##SC: It works!
+## changed $year==12 to $mon<8 (POSIXlt indexes months from 0
+## and growing season starts in SEP) 
+
 
 yr_season <- paste( 1900 + # this is the base year for POSIXlt year numbering 
                       as.POSIXlt( d )$year - 
@@ -68,12 +67,13 @@ datW <- addLayer(datW, datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi
 
 
 
-ssn <- substring(names(datW), 7)
-datWm <- stackApply(datW, ssn, mean)
-names(datWm) <- unique(ssn)
+ssn <- substring(names(datW), 7) #season names
+datWm <- stackApply(datW, ssn, mean) #seasonal mean for wide years
+names(datWm) <- unique(ssn) #meaningful names
 
-SeasonsW <- datWm - datMs
+SeasonsW <- datWm - datMs #composite difference
 
+## Second verse same as the first.
 datN <- datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[1] )]]
 datN <- addLayer(datN, datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[2] )]],
                  datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[3])]],
@@ -84,8 +84,9 @@ ssn <- substring(names(datN), 7)
 datNm <- stackApply(datN, ssn, mean)
 names(datNm) <- unique(ssn)
 
-
 SeasonsN <- datNm - datMs 
+
+#### Plotting the composites
 
 library(rgdal)
 library(rgeos)

@@ -1,3 +1,4 @@
+rm(list=ls())
 library(raster)
 
 
@@ -27,6 +28,8 @@ datC <- datC[[which(as.numeric(substr(names(datC), 2, 5)) >= F_yr &
                       as.numeric(substr(names(datC), 2, 5)) <= L_yr)]]
 datC <- datC[[-c(1:2, (nlayers(datC)-3):nlayers(datC))]] #removes first incomplete season JF and last SON from year
 
+# ##Get Mean of seasonal sea level pressure using seasons
+ssn <-substr(yr_season, 6,8)
 ##### Seasonal Indexing ######
 library(chron)
 
@@ -44,23 +47,19 @@ yr_season <- paste( 1900 + # this is the base year for POSIXlt year numbering
                       1+((as.POSIXlt(d)$mon+1) %/% 3)%%4] 
                     , sep="-")
 
-##remove unnecessary files
-rm(yr_mo_dy, d)
-
-# ##Get Mean of seasonal sea level pressure using seasons
-ssn <-substr(yr_season, 6,8)
-datT <- stackApply(datC, ssn, mean)
-names(datT) <- unique(ssn)
-
 ## Get yearly seasonal means
 datM <- stackApply(datC, yr_season, mean) #raster with mean for each season
 names(datM) <- unique(yr_season)
 
-datW <- datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rWi$year[1] )]]
-datW <- addLayer(datW, datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rWi$year[2] )]],
-                 datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rWi$year[3])]],
-                 datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rWi$year[4])]],
-                 datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rWi$year[5])]])
+datW <- datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[1] )]]
+datW <- addLayer(datW, datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[2] )]],
+                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[3])]],
+                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[4])]],
+                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[5])]])
+
+
+datWm <- stackApply(datW, yr_season, mean)
+
                  
 datN <- datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[1] )]]
 datN <- addLayer(datN, datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[2] )]],
@@ -79,7 +78,7 @@ datN <- addLayer(datN, datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa
 
 
 ## Wide year correlations with SLP
-for (i in unique(substring(yr_season, 6))){
+for (i in unique(substring(names(datW), 7))){
   assign(paste0(i, ".w"), values(subset(datW, grep(i, names(datW), value=T))))
 }
 

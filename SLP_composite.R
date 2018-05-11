@@ -2,7 +2,8 @@ rm(list=ls())
 library(raster)
 
 #Netcdf
-slp <- brick("../ERA_Download/era_interim_moda_SLP_all.nc")
+#slp <- brick("../ERA_Download/era_interim_moda_SLP_all.nc")
+slp <- brick("../../Climate_analysis/ERA_Download/era_interim_moda_SLP_all.nc")
 
 ## Tree ring data
 trDat <- read.table("../../KBP_South/KBPS_cull_gap.rwl_tabs.txt", header = TRUE)
@@ -34,8 +35,6 @@ datC <- datC[[which(as.numeric(substr(names(datC), 2, 5)) >= F_yr &
                       as.numeric(substr(names(datC), 2, 5)) <= L_yr)]]
 datC <- datC[[-c(1:2, (nlayers(datC)-3):nlayers(datC))]] #removes first incomplete season JF and last SON from year
 
-# ##Get Mean of seasonal sea level pressure using seasons
-ssn <-substr(yr_season, 6,8)
 ##### Seasonal Indexing ######
 library(chron)
 
@@ -56,9 +55,7 @@ yr_season <- paste( 1900 + # this is the base year for POSIXlt year numbering
 datM <- stackApply(datC, yr_season, mean) #raster with mean for each season
 names(datM) <- unique(yr_season)
 
-
-##### Creating the composite #####
-## create seasonal mean.
+## create seasonal means.
 ssn <- substring(names(datM), 7) #season names for 30 yr seasonal mean
 datMs <- stackApply(datM, ssn, mean) #create the mean
 names(datMs) <- unique(ssn) #give them meaningful names
@@ -66,13 +63,12 @@ datMs <- subset(datMs, c(3,4,1,2)) #reorder because they are setup as MAM, JJA, 
 
 
 ## Extract wide years from TR data; clunky right now.
-datW <- datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[1] )]]
-datW <- addLayer(datW, datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[2] )]],
-                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[3])]],
-                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[4])]],
-                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[5])]])
-
-
+# datW <- datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[1] )]]
+# datW <- addLayer(datW, datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[2] )]],
+#                  datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[3])]],
+#                  datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[4])]],
+#                  datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[5])]])
+datW <- datM[[which(as.numeric(substr(names(datM), 2, 5)) %in% lq_yrs) ]]
 
 ssn <- substring(names(datW), 7) #season names
 datWm <- stackApply(datW, ssn, mean) #seasonal mean for wide years
@@ -81,11 +77,12 @@ names(datWm) <- unique(ssn) #meaningful names
 SeasonsW <- datWm - datMs #composite difference
 
 ## Second verse same as the first.
-datN <- datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[1] )]]
-datN <- addLayer(datN, datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[2] )]],
-                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[3])]],
-                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[4])]],
-                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[5])]])             
+# datN <- datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[1] )]]
+# datN <- addLayer(datN, datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[2] )]],
+#                  datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[3])]],
+#                  datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[4])]],
+#                  datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rNa$year[5])]])             
+datN <- datM[[which(as.numeric(substr(names(datM), 2, 5)) %in% uq_yrs) ]]
 
 ssn <- substring(names(datN), 7)
 datNm <- stackApply(datN, ssn, mean)
@@ -97,7 +94,7 @@ SeasonsN <- datNm - datMs
 
 library(rgdal)
 library(rgeos)
-coast_shapefile <- crop(readOGR("../GISData/ne_10m_coastline.shp"), ext)
+coast_shapefile <- crop(readOGR("../../Climate_analysis/GISData/ne_10m_coastline.shp"), ext)
 
 #Create color ramps for mapping and number of colors to use
 library(colorRamps)
@@ -135,6 +132,38 @@ levelplot(SeasonsNW, layout=c(2,2), col.regions = col5, pretty=TRUE, main="Narro
           ), par.strip.text = list(font="bold")) + 
   layer(sp.lines(coast_shapefile))
 
+#######Can we delete stuff below here? Or move to separate script?#############
+#Load the lattice packages to display the maps
+library(rasterVis)
+library(gridExtra)
+
+
+#### 30yr Mean - Narrow years
+levelplot(SeasonsN, layout=c(2,2), col.regions = col5, pretty=TRUE, main="Narrow Composite Mean SLP Diff 1979 - 2011",
+          colorkey=list(space="bottom"),
+          par.settings = list(layout.heights=list(xlab.key.padding=1),
+                              strip.background=list(col="lightgrey")
+          ), par.strip.text = list(font="bold")) + 
+  layer(sp.lines(coast_shapefile))
+
+
+#### 30yr Mean - Wide years
+levelplot(SeasonsW, layout=c(2,2), col.regions = col5, pretty=TRUE, main="Wide Composite Mean SLP Diff 1979 - 2011",
+          colorkey=list(space="bottom"),
+          par.settings = list(layout.heights=list(xlab.key.padding=1),
+                              strip.background=list(col="lightgrey")
+          ), par.strip.text = list(font="bold")) + 
+  layer(sp.lines(coast_shapefile))
+
+#### Narrow - Wide
+SeasonsNW <- datNm - datWm
+
+levelplot(SeasonsNW, layout=c(2,2), col.regions = col5, pretty=TRUE, main="Narrow-Wide Composite Mean SLP Diff 1979 - 2011",
+          colorkey=list(space="bottom"),
+          par.settings = list(layout.heights=list(xlab.key.padding=1),
+                              strip.background=list(col="lightgrey")
+          ), par.strip.text = list(font="bold")) + 
+  layer(sp.lines(coast_shapefile))
 
 
 #### Looking at climate correlation - not relevant to composite ####

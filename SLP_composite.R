@@ -1,9 +1,11 @@
 rm(list=ls())
 library(raster)
 
+#Netcdf
+slp <- brick("../ERA_Download/era_interim_moda_SLP_all.nc")
 
-slp <- brick("../ERA_Download/era_interim_moda_SLP.nc")
-trDat <- read.csv("chronos.csv", head=T)
+## Tree ring data
+trDat <- read.table("../../KBP_South/KBPS_cull_gap.rwl_tabs.txt", header = TRUE)
 
 ## Decide start year and end year based on target and tree ring data
 F_yr <- min(as.numeric(substr(names(slp), 2, 5)))
@@ -12,9 +14,13 @@ L_yr <- as.numeric(max(trDat$year))
 #Crop data to it
 trDat <-trDat[which(trDat$year >= F_yr-1 & trDat$year<= L_yr),]
 
-## Five largest and five smallest years
-rWi <- trDat[order(trDat$mr_kbp, decreasing=T)[1:5],]
-rNa <- trDat[order(trDat$mr_kbp)[1:5],]
+## Smallest x% years, Largest x% years
+quants <- quantile(trDat$ars, probs = c(0.25, 0.75))
+lq_yrs <- trDat$year[which(trDat$ars<quants[1])]
+uq_yrs <- trDat$year[which(trDat$ars>quants[2])]
+
+#rWi <- trDat[order(trDat$ars, decreasing=T)[1:5],]
+#rNa <- trDat[order(trDat$ars)[1:5],]
 
 ## set spatial extent for area interested in. Longitude min - max then latitude min - max
 ## Creating this way allows for other created rasters to recognize as an extent with 
@@ -51,21 +57,25 @@ yr_season <- paste( 1900 + # this is the base year for POSIXlt year numbering
 datM <- stackApply(datC, yr_season, mean) #raster with mean for each season
 names(datM) <- unique(yr_season)
 
-datW <- datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[1] )]]
-datW <- addLayer(datW, datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[2] )]],
-                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[3])]],
-                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[4])]],
-                 datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[5])]])
+#Select those layers == composite years
+datW <- datM[[which(as.numeric(substr(names(datM), 2, 5)) %in% lq_yrs) ]]
+#datWm <- stackApply(datW, unique(substr(names(datW),7,9), mean))
+
+# datW <- addLayer(datW, datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[2] )]],
+#                  datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[3])]],
+#                  datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[4])]],
+#                  datM[[which(as.numeric(substr(names(datM), 2, 5)) ==  rWi$year[5])]])
 
 
-datWm <- stackApply(datW, yr_season, mean)
+datN <- datM[[which(as.numeric(substr(names(datM), 2, 5)) %in% uq_yrs) ]]
+#datNm <- stackApply(datN, unique(names(datN)), mean)
 
                  
-datN <- datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[1] )]]
-datN <- addLayer(datN, datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[2] )]],
-                 datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[3])]],
-                 datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[4])]],
-                 datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[5])]])             
+# datN <- datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[1] )]]
+# datN <- addLayer(datN, datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[2] )]],
+#                  datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[3])]],
+#                  datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[4])]],
+#                  datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa$year[5])]])             
 
 
 # If data is not continuous you must
@@ -73,21 +83,21 @@ datN <- addLayer(datN, datC[[which(as.numeric(substr(names(datC), 2, 5)) ==  rNa
 # For temperature, 0 will not work since values do go to 0 or below. 
 # Done at this stage because data can be too large.
 # Also subsets seasons at same time
-
-## datW (wide years), datN (narrow)
-
-
-## Wide year correlations with SLP
-for (i in unique(substring(names(datW), 7))){
-  assign(paste0(i, ".w"), values(subset(datW, grep(i, names(datW), value=T))))
+#Creates SONw etc. for mean of wide years
+for (i in unique(substring(yr_season, 6))){
+  d <- values(subset(datW, grep(i, names(datW), value=T)))
+  d[is.na(d[])] <- -9999
+  assign(paste0(i, "w"), d)
+  #Replace with first differencing using diff()
+  lm_x <- seq(1:dim(get(i))[2])
+  r <- t(resid(lm(t(get(i)) ~ lm_x))) 
+  assign(paste0(i, "w"), r)
+  rm(r, d, lm_x)
 }
 
-SON.w[is.na(SON.w[])] <- -10
-DJF.w[is.na(DJF.w[])] <- -10
-JJA.w[is.na(JJA.w[])] <- -10
-MAM.w[is.na(MAM.w[])] <- -10
+#Plot climate field composite for wide years
 
-#create rasters to ingest the spatial correlations
+#create rasters to ingest the seasonal composites
 CorT <- setExtent(raster(nrow = nrow(datW), ncol = ncol(datW)),ext)
 Cor <- setExtent(raster(nrow = nrow(datW), ncol = ncol(datW)),ext)
 
